@@ -1,0 +1,1822 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>多模态大语言模型推理加速研究 | AI 毕业设计</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Outfit:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:          #f8f7f3;
+    --surface:     #ffffff;
+    --surface-2:   #f0ebe3;
+    --border:      rgba(0,0,0,0.08);
+    --accent:      #c4942d;
+    --accent-dim:  rgba(196,148,45,0.12);
+    --accent-glow: rgba(196,148,45,0.22);
+    --text-1:      #1a1a1a;
+    --text-2:      #4a4a4a;
+    --text-3:      #888888;
+    --radius:      12px;
+    --font-display: 'Cormorant Garamond', Georgia, serif;
+    --font-body:    'Outfit', sans-serif;
+    --font-mono:    'JetBrains Mono', monospace;
+  }
+  
+  body.dark {
+    --bg:          #080808;
+    --surface:     #121212;
+    --surface-2:   #1f1f1f;
+    --border:      rgba(255,255,255,0.06);
+    --accent:      #e8c547;
+    --accent-dim:  rgba(232,197,71,0.1);
+    --accent-glow: rgba(232,197,71,0.2);
+    --text-1:      #f0f0f0;
+    --text-2:      #a8a8a8;
+    --text-3:      #707070;
+  }
+  
+  /* Dark mode overrides for hardcoded colors - elevated luxury */
+  body.dark #hero { 
+    background: radial-gradient(circle at 20% 50%, rgba(232,197,71,0.08) 0%, transparent 50%),
+                radial-gradient(circle at 80% 80%, rgba(100,200,255,0.05) 0%, transparent 50%),
+                linear-gradient(135deg, #0a0a0a 0%, #141414 50%, #0a0a0a 100%) !important;
+  }
+  body.dark .hero-badge { 
+    background: linear-gradient(135deg, rgba(232,197,71,0.1), rgba(232,197,71,0.05)) !important;
+    border-color: rgba(232,197,71,0.2) !important;
+    backdrop-filter: blur(10px) !important;
+  }
+  body.dark #abstract { background: linear-gradient(180deg, #080808 0%, #0f0f0f 100%) !important; }
+  body.dark #highlights { background: linear-gradient(180deg, #0f0f0f 0%, #080808 100%) !important; }
+  body.dark #tech { background: linear-gradient(180deg, #080808 0%, #0f0f0f 100%) !important; }
+  body.dark #results { background: linear-gradient(180deg, #0f0f0f 0%, #080808 100%) !important; }
+  body.dark #timeline { background: linear-gradient(180deg, #080808 0%, #0f0f0f 100%) !important; }
+  body.dark #defense { background: linear-gradient(180deg, #0f0f0f 0%, #080808 100%) !important; }
+  body.dark footer { background: linear-gradient(180deg, #000000 0%, #0a0a0a 100%) !important; }
+  body.dark .bento-card {
+    background: linear-gradient(135deg, #161616 0%, #1a1a1a 100%);
+    border: 1px solid rgba(232,197,71,0.1);
+  }
+  body.dark .bento-card:hover {
+    background: linear-gradient(135deg, #1a1a1a 0%, #1f1f1f 100%);
+    border-color: rgba(232,197,71,0.25);
+    box-shadow: 0 20px 60px rgba(232,197,71,0.1);
+  }
+  body.dark .screenshot-inner { 
+    background: linear-gradient(135deg, #161616 0%, #1a1a1a 100%);
+    box-shadow: inset 0 1px 3px rgba(232,197,71,0.1);
+  }
+  body.dark .chart-card {
+    background: linear-gradient(135deg, #151515 0%, #1a1a1a 100%);
+    border: 1px solid rgba(232,197,71,0.1);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+  }
+  body.dark .metric-cell {
+    background: linear-gradient(135deg, #161616 0%, #1a1a1a 100%);
+    border-right: 1px solid rgba(232,197,71,0.08);
+  }
+  body.dark nav.scrolled { 
+    background: rgba(8,8,8,.95) !important;
+    border-color: rgba(232,197,71,0.1) !important;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.6) !important;
+    backdrop-filter: blur(30px) !important;
+  }
+  body.dark .file-item {
+    background: linear-gradient(135deg, #161616 0%, #1a1a1a 100%);
+    border: 1px solid rgba(232,197,71,0.08);
+  }
+  body.dark .file-item:hover {
+    background: linear-gradient(135deg, #1a1a1a 0%, #1f1f1f 100%);
+    border-color: rgba(232,197,71,0.2);
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text-1);
+    font-family: var(--font-body);
+    font-weight: 300;
+    line-height: 1.7;
+    overflow-x: hidden;
+  }
+
+  /* ─── NOISE OVERLAY ─────────────────────────────────────────── */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+    background-size: 256px;
+    pointer-events: none;
+    z-index: 9999;
+    opacity: .5;
+  }
+
+  /* ─── NAV ────────────────────────────────────────────────────── */
+  nav {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1.25rem 3rem;
+    border-bottom: 1px solid transparent;
+    transition: border-color .4s, background .4s, backdrop-filter .4s;
+  }
+  nav.scrolled {
+    background: rgba(248,247,243,.92);
+    backdrop-filter: blur(20px);
+    border-color: var(--border);
+    box-shadow: 0 4px 16px rgba(0,0,0,.08);
+  }
+  .nav-logo {
+    font-family: var(--font-display);
+    font-size: 1.1rem;
+    letter-spacing: .05em;
+    color: var(--accent);
+  }
+  .nav-links { display: flex; gap: 2rem; list-style: none; }
+  .nav-links a {
+    font-size: .82rem;
+    font-weight: 400;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--text-2);
+    text-decoration: none;
+    transition: color .25s;
+  }
+  .nav-links a:hover { color: var(--text-1); }
+  
+  /* ─── THEME TOGGLE ────────────────────────────────────────────────── */
+  .theme-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-left: auto;
+    background: var(--border);
+    border-radius: 999px;
+    padding: 0.35rem 0.5rem;
+    cursor: pointer;
+    transition: background 0.3s;
+  }
+  .theme-toggle:hover {
+    background: var(--accent-dim);
+  }
+  .theme-icon {
+    font-size: 1.1rem;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.3s;
+  }
+  .theme-toggle:hover .theme-icon {
+    transform: rotate(20deg);
+  }
+  .theme-label {
+    font-size: 0.75rem;
+    color: var(--text-2);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-weight: 500;
+    min-width: 20px;
+  }
+
+  /* ─── SECTION BASE ───────────────────────────────────────────── */
+  section { padding: 7rem 0; }
+  .container { width: min(1180px, 90%); margin: 0 auto; }
+
+  .section-label {
+    display: inline-flex;
+    align-items: center;
+    gap: .6rem;
+    font-size: .72rem;
+    font-weight: 500;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 1.5rem;
+  }
+  .section-label::before {
+    content: '';
+    display: block;
+    width: 24px; height: 1px;
+    background: var(--accent);
+  }
+
+  /* ─── HERO ───────────────────────────────────────────────────── */
+  #hero {
+    min-height: 100dvh;
+    display: grid;
+    place-items: center;
+    padding: 0;
+    position: relative;
+    overflow: hidden;
+    background: linear-gradient(135deg, #fbfaf8 0%, #f0ebe3 50%, #f8f7f3 100%);
+  }
+
+  .hero-orb {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(120px);
+    pointer-events: none;
+  }
+  .orb-1 {
+    width: 600px; height: 600px;
+    background: radial-gradient(circle, rgba(212,168,67,.18) 0%, transparent 70%);
+    top: -100px; left: -150px;
+    animation: drift 14s ease-in-out infinite alternate;
+  }
+  .orb-2 {
+    width: 500px; height: 500px;
+    background: radial-gradient(circle, rgba(100,80,200,.12) 0%, transparent 70%);
+    bottom: -80px; right: -100px;
+    animation: drift 18s ease-in-out infinite alternate-reverse;
+  }
+  @keyframes drift {
+    from { transform: translate(0, 0); }
+    to   { transform: translate(40px, 30px); }
+  }
+
+  .hero-inner {
+    position: relative;
+    text-align: center;
+    padding: 2rem;
+    max-width: 900px;
+  }
+
+  .hero-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: .5rem;
+    padding: .35rem 1rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    font-size: .78rem;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--text-2);
+    margin-bottom: 2.5rem;
+    background: rgba(255,255,255,.03);
+    backdrop-filter: blur(6px);
+    animation: fadeUp .8s .1s both;
+  }
+  .hero-badge-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    animation: pulse 2.5s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%,100% { opacity: 1; transform: scale(1); }
+    50% { opacity: .4; transform: scale(.7); }
+  }
+
+  .hero-title {
+    font-family: var(--font-display);
+    font-size: clamp(3rem, 8vw, 6.5rem);
+    font-weight: 300;
+    line-height: 1.1;
+    letter-spacing: -.01em;
+    color: var(--text-1);
+    margin-bottom: 1.25rem;
+    animation: fadeUp .9s .2s both;
+  }
+  .hero-title em {
+    font-style: italic;
+    color: var(--accent);
+  }
+  .hero-subtitle {
+    font-size: clamp(1rem, 2.5vw, 1.25rem);
+    font-weight: 300;
+    color: var(--text-2);
+    max-width: 620px;
+    margin: 0 auto 2.5rem;
+    line-height: 1.8;
+    animation: fadeUp .9s .35s both;
+  }
+
+  .hero-meta {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 2.5rem;
+    flex-wrap: wrap;
+    margin-bottom: 3rem;
+    animation: fadeUp .9s .45s both;
+  }
+  .hero-meta-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: .2rem;
+  }
+  .hero-meta-label {
+    font-size: .7rem;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--text-3);
+  }
+  .hero-meta-value {
+    font-size: .9rem;
+    color: var(--text-2);
+  }
+  .hero-divider {
+    width: 1px; height: 32px;
+    background: var(--border);
+  }
+
+  .hero-ctas {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    animation: fadeUp .9s .55s both;
+  }
+  .btn-primary {
+    padding: .75rem 2rem;
+    background: var(--accent);
+    color: #ffffff;
+    font-family: var(--font-body);
+    font-size: .85rem;
+    font-weight: 500;
+    letter-spacing: .06em;
+    border: none;
+    border-radius: var(--radius);
+    cursor: pointer;
+    text-decoration: none;
+    transition: opacity .2s, transform .15s;
+  }
+  .btn-primary:hover { opacity: .88; transform: translateY(-1px); }
+  .btn-primary:active { transform: translateY(0); }
+  .btn-ghost {
+    padding: .75rem 2rem;
+    background: transparent;
+    color: var(--text-2);
+    font-family: var(--font-body);
+    font-size: .85rem;
+    font-weight: 400;
+    letter-spacing: .06em;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    cursor: pointer;
+    text-decoration: none;
+    transition: border-color .2s, color .2s, transform .15s;
+  }
+  .btn-ghost:hover { border-color: rgba(255,255,255,.2); color: var(--text-1); transform: translateY(-1px); }
+
+  .hero-scroll {
+    position: absolute;
+    bottom: 2.5rem;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: .5rem;
+    animation: fadeUp 1s .8s both;
+  }
+  .hero-scroll-line {
+    width: 1px; height: 48px;
+    background: linear-gradient(to bottom, transparent, var(--text-3));
+    animation: scrollLine 2s ease-in-out infinite;
+  }
+  @keyframes scrollLine {
+    0%,100% { opacity: 0; transform: scaleY(0); transform-origin: top; }
+    30%,70% { opacity: 1; transform: scaleY(1); }
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(24px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ─── ABSTRACT ───────────────────────────────────────────────── */
+  #abstract {
+    border-top: 1px solid var(--border);
+    background: linear-gradient(to bottom, #fbfaf8, #f8f7f3);
+  }
+  .abstract-grid {
+    display: grid;
+    grid-template-columns: 1fr 1.8fr;
+    gap: 6rem;
+    align-items: start;
+  }
+  .abstract-quote {
+    position: sticky;
+    top: 8rem;
+  }
+  .abstract-quote-mark {
+    font-family: var(--font-display);
+    font-size: 8rem;
+    line-height: .7;
+    color: var(--accent);
+    opacity: .3;
+    margin-bottom: .5rem;
+    user-select: none;
+  }
+  .abstract-quote-text {
+    font-family: var(--font-display);
+    font-size: 1.45rem;
+    font-style: italic;
+    line-height: 1.6;
+    color: var(--text-2);
+  }
+  .abstract-quote-author {
+    margin-top: 1.5rem;
+    font-size: .8rem;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--text-3);
+  }
+  .abstract-body h3 {
+    font-family: var(--font-display);
+    font-size: 2rem;
+    font-weight: 400;
+    line-height: 1.3;
+    margin-bottom: 1.5rem;
+    color: var(--text-1);
+  }
+  .abstract-body p {
+    font-size: 1rem;
+    color: var(--text-2);
+    margin-bottom: 1.25rem;
+    max-width: 620px;
+  }
+  .abstract-keywords {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem;
+    margin-top: 2rem;
+  }
+  .keyword {
+    padding: .3rem .9rem;
+    background: var(--accent-dim);
+    border: 1px solid rgba(212,168,67,.2);
+    border-radius: 999px;
+    font-size: .78rem;
+    font-family: var(--font-mono);
+    color: var(--accent);
+  }
+
+  /* ─── HIGHLIGHTS ─────────────────────────────────────────────── */
+  #highlights {
+    border-top: 1px solid var(--border);
+    background: linear-gradient(to bottom, #f8f7f3, #fbfaf8);
+  }
+  .highlights-header {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 3rem;
+    align-items: end;
+    margin-bottom: 4rem;
+  }
+  .highlights-header h2 {
+    font-family: var(--font-display);
+    font-size: clamp(2rem, 4vw, 3rem);
+    font-weight: 300;
+    line-height: 1.2;
+  }
+  .highlights-header p {
+    font-size: .95rem;
+    color: var(--text-2);
+  }
+
+  .bento {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    grid-template-rows: auto auto;
+    gap: 1rem;
+  }
+  .bento-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 2rem;
+    transition: border-color .3s, transform .25s;
+    position: relative;
+    overflow: hidden;
+  }
+  .bento-card:hover {
+    border-color: rgba(212,168,67,.25);
+    transform: translateY(-2px);
+  }
+  .bento-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at 0% 0%, var(--accent-dim), transparent 60%);
+    opacity: 0;
+    transition: opacity .4s;
+  }
+  .bento-card:hover::before { opacity: 1; }
+
+  .bento-1 { grid-column: span 3; grid-row: span 1; }
+  .bento-2 { grid-column: span 2; grid-row: span 1; }
+  .bento-3 { grid-column: span 1; grid-row: span 2; background: var(--accent); border-color: transparent; }
+  .bento-4 { grid-column: span 2; grid-row: span 1; }
+  .bento-5 { grid-column: span 3; grid-row: span 1; }
+
+  .bento-3 .card-number,
+  .bento-3 .card-title,
+  .bento-3 .card-desc { color: #ffffff !important; }
+  .bento-3::before { display: none; }
+
+  .card-number {
+    font-family: var(--font-mono);
+    font-size: .7rem;
+    color: var(--text-3);
+    letter-spacing: .1em;
+    margin-bottom: 1.5rem;
+  }
+  .card-icon {
+    font-size: 2rem;
+    margin-bottom: 1rem;
+  }
+  .card-title {
+    font-family: var(--font-display);
+    font-size: 1.35rem;
+    font-weight: 400;
+    color: var(--text-1);
+    margin-bottom: .75rem;
+    line-height: 1.3;
+  }
+  .card-desc {
+    font-size: .88rem;
+    color: var(--text-2);
+    line-height: 1.7;
+  }
+  .card-stat {
+    margin-top: 1.5rem;
+    font-family: var(--font-display);
+    font-size: 2.5rem;
+    font-weight: 300;
+    color: var(--accent);
+    line-height: 1;
+  }
+  .bento-3 .card-stat { color: #07070f; }
+  .card-stat-label {
+    font-size: .75rem;
+    color: var(--text-2);
+    margin-top: .3rem;
+  }
+  .bento-3 .card-stat-label { color: rgba(7,7,15,.6); }
+
+  /* ─── TECH STACK ─────────────────────────────────────────────── */
+  #tech {
+    border-top: 1px solid var(--border);
+  }
+  .tech-grid {
+    display: grid;
+    grid-template-columns: 1.2fr 1fr;
+    gap: 5rem;
+    align-items: center;
+  }
+  .tech-desc h2 {
+    font-family: var(--font-display);
+    font-size: clamp(1.8rem, 3.5vw, 2.6rem);
+    font-weight: 300;
+    line-height: 1.25;
+    margin-bottom: 1.25rem;
+  }
+  .tech-desc p {
+    font-size: .95rem;
+    color: var(--text-2);
+    margin-bottom: 1rem;
+    max-width: 480px;
+  }
+  .tech-list {
+    display: flex;
+    flex-direction: column;
+    gap: .75rem;
+    margin-top: 2rem;
+  }
+  .tech-item {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: .85rem 1.25rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    transition: border-color .25s;
+  }
+  .tech-item:hover { border-color: rgba(212,168,67,.3); }
+  .tech-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--accent);
+    flex-shrink: 0;
+  }
+  .tech-item-name {
+    font-size: .9rem;
+    font-weight: 500;
+    flex: 1;
+  }
+  .tech-item-role {
+    font-size: .78rem;
+    color: var(--text-3);
+    font-family: var(--font-mono);
+  }
+
+  /* Architecture diagram */
+  .arch-diagram {
+    position: relative;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 2.5rem;
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .arch-center {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 110px; height: 110px;
+    background: var(--accent);
+    border-radius: 50%;
+    text-align: center;
+    z-index: 2;
+    position: relative;
+    box-shadow: 0 0 60px var(--accent-glow);
+  }
+  .arch-center-label {
+    font-family: var(--font-display);
+    font-size: .85rem;
+    color: #ffffff;
+    font-weight: 600;
+    line-height: 1.2;
+  }
+  .arch-nodes {
+    position: absolute;
+    inset: 0;
+  }
+  .arch-node {
+    position: absolute;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: .5rem .9rem;
+    font-size: .78rem;
+    font-family: var(--font-mono);
+    color: var(--text-2);
+    white-space: nowrap;
+    transition: border-color .25s, color .25s;
+  }
+  .arch-node:hover { border-color: var(--accent); color: var(--accent); }
+
+  .arch-node-1 { top: 1.5rem; left: 50%; transform: translateX(-50%); }
+  .arch-node-2 { top: 50%; left: 1.5rem; transform: translateY(-50%); }
+  .arch-node-3 { top: 50%; right: 1.5rem; transform: translateY(-50%); }
+  .arch-node-4 { bottom: 1.5rem; left: 50%; transform: translateX(-50%); }
+  .arch-node-5 { top: 20%; left: 15%; }
+  .arch-node-6 { top: 20%; right: 15%; }
+  .arch-node-7 { bottom: 20%; left: 15%; }
+  .arch-node-8 { bottom: 20%; right: 15%; }
+
+  /* ─── RESULTS ────────────────────────────────────────────────── */
+  #results {
+    border-top: 1px solid var(--border);
+    background: linear-gradient(to bottom, #fbfaf8, #f0ebe3);
+  }
+  .results-header {
+    text-align: center;
+    margin-bottom: 4rem;
+  }
+  .results-header h2 {
+    font-family: var(--font-display);
+    font-size: clamp(2rem, 4vw, 3rem);
+    font-weight: 300;
+    margin-bottom: 1rem;
+  }
+  .results-header p {
+    font-size: .95rem;
+    color: var(--text-2);
+    max-width: 500px;
+    margin: 0 auto;
+  }
+  .metrics-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1px;
+    background: var(--border);
+    border-radius: 16px;
+    overflow: hidden;
+    margin-bottom: 3rem;
+  }
+  .metric-cell {
+    background: var(--surface);
+    padding: 2.5rem;
+    text-align: center;
+    transition: background .25s;
+  }
+  .metric-cell:hover { background: rgba(255,255,255,.03); }
+  .metric-value {
+    font-family: var(--font-display);
+    font-size: 3rem;
+    font-weight: 300;
+    color: var(--accent);
+    line-height: 1;
+    margin-bottom: .5rem;
+  }
+  .metric-label {
+    font-size: .8rem;
+    color: var(--text-2);
+    letter-spacing: .05em;
+  }
+
+  .screenshots-row {
+    display: grid;
+    grid-template-columns: 1.6fr 1fr 1fr;
+    gap: 1rem;
+  }
+  .screenshot-card {
+    border-radius: 14px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    position: relative;
+  }
+  .screenshot-inner {
+    aspect-ratio: 16/10;
+    background: linear-gradient(135deg, #f0ebe3 0%, #e8e0d6 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+  }
+  .screenshot-inner::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 400 250%22%3E%3Cdefs%3E%3ClinearGradient id=%22sg%22%3E%3Cstop offset=%220%25%22 style=%22stop-color:%23d4b5a0;stop-opacity:0.08%22/%3E%3Cstop offset=%22100%25%22 style=%22stop-color:%23c4942d;stop-opacity:0.04%22/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width=%22400%22 height=%22250%22 fill=%22url(%23sg)%22/%3E%3Ccircle cx=%22100%22 cy=%2280%22 r=%2250%22 fill=%22%23c4942d%22 opacity=%220.06%22/%3E%3Ccircle cx=%22320%22 cy=%22170%22 r=%2270%22 fill=%22%23c4942d%22 opacity=%220.05%22/%3E%3C/svg%3E') center/cover;
+    opacity: .7;
+  }
+  .screenshot-inner.tall { aspect-ratio: 4/5; }
+  .screenshot-placeholder {
+    font-family: var(--font-mono);
+    font-size: .75rem;
+    color: var(--text-3);
+    letter-spacing: .1em;
+  }
+  .screenshot-caption {
+    padding: .75rem 1rem;
+    font-size: .8rem;
+    color: var(--text-2);
+  }
+  
+  /* ─── DATA CHARTS ────────────────────────────────────────────── */
+  .charts-grid {
+    display: grid;
+    grid-template-columns: 1.5fr 1fr;
+    gap: 1.5rem;
+    margin-top: 3rem;
+  }
+  .chart-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 2rem;
+    overflow: hidden;
+  }
+  .chart-title {
+    font-family: var(--font-display);
+    font-size: 1.2rem;
+    font-weight: 400;
+    color: var(--text-1);
+    margin-bottom: 0.5rem;
+  }
+  .chart-subtitle {
+    font-size: 0.8rem;
+    color: var(--text-3);
+    margin-bottom: 1.5rem;
+  }
+  canvas { display: block; }
+  
+  /* ─── HONORS SECTION ──────────────────────────────────────────────── */
+  .honors-section {
+    margin-top: 4rem;
+    padding-top: 3rem;
+    border-top: 1px solid var(--border);
+  }
+  .honors-section h3 {
+    font-family: var(--font-display);
+    font-size: clamp(1.5rem, 3vw, 2.2rem);
+    font-weight: 300;
+    margin-bottom: 3rem;
+    line-height: 1.3;
+  }
+  .honors-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 1.5rem;
+  }
+  .honor-card {
+    padding: 2rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+  }
+  .honor-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at 0% 0%, var(--accent-dim), transparent 60%);
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  .honor-card:hover {
+    transform: translateY(-4px);
+    border-color: rgba(196,148,45,0.25);
+    box-shadow: 0 16px 48px rgba(0,0,0,0.12);
+  }
+  .honor-card:hover::before { opacity: 1; }
+  
+  body.dark .honor-card {
+    background: linear-gradient(135deg, #161616 0%, #1a1a1a 100%);
+    border-color: rgba(232,197,71,0.1);
+  }
+  body.dark .honor-card:hover {
+    border-color: rgba(232,197,71,0.25);
+    box-shadow: 0 16px 48px rgba(232,197,71,0.08);
+  }
+  
+  .honor-icon {
+    font-size: 2.5rem;
+    margin-bottom: 1rem;
+  }
+  .honor-title {
+    font-family: var(--font-display);
+    font-size: 1.15rem;
+    font-weight: 400;
+    color: var(--text-1);
+    margin-bottom: 1rem;
+    position: relative;
+    z-index: 1;
+  }
+  .honor-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    position: relative;
+    z-index: 1;
+  }
+  .honor-item {
+    font-size: 0.85rem;
+    color: var(--text-2);
+    line-height: 1.5;
+    padding-left: 0.75rem;
+    position: relative;
+  }
+  .honor-item::before {
+    content: '▪';
+    position: absolute;
+    left: 0;
+    color: var(--accent);
+    opacity: 0.6;
+  }
+  
+  @media (max-width: 900px) {
+    .charts-grid { grid-template-columns: 1fr; }
+  }
+
+  /* ─── TIMELINE ───────────────────────────────────────────────── */
+  #timeline {
+    border-top: 1px solid var(--border);
+    background: linear-gradient(to bottom, #f8f7f3, #fbfaf8);
+  }
+  .timeline-header {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 3rem;
+    margin-bottom: 5rem;
+  }
+  .timeline-header h2 {
+    font-family: var(--font-display);
+    font-size: clamp(2rem, 4vw, 3rem);
+    font-weight: 300;
+  }
+  .timeline-header p {
+    font-size: .95rem;
+    color: var(--text-2);
+    align-self: end;
+  }
+  .timeline {
+    position: relative;
+    padding-left: 3rem;
+  }
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 0; top: .7rem; bottom: 0;
+    width: 1px;
+    background: linear-gradient(to bottom, var(--accent), transparent);
+  }
+  .timeline-item {
+    position: relative;
+    padding-bottom: 3.5rem;
+  }
+  .timeline-item:last-child { padding-bottom: 0; }
+  .timeline-dot {
+    position: absolute;
+    left: -3.35rem;
+    top: .7rem;
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 16px var(--accent-glow);
+  }
+  .timeline-dot.inactive {
+    background: var(--text-3);
+    box-shadow: none;
+  }
+  .timeline-date {
+    font-family: var(--font-mono);
+    font-size: .72rem;
+    color: var(--text-3);
+    letter-spacing: .1em;
+    margin-bottom: .5rem;
+  }
+  .timeline-title {
+    font-family: var(--font-display);
+    font-size: 1.3rem;
+    font-weight: 400;
+    color: var(--text-1);
+    margin-bottom: .5rem;
+  }
+  .timeline-desc {
+    font-size: .88rem;
+    color: var(--text-2);
+    max-width: 560px;
+  }
+  .timeline-tag {
+    display: inline-block;
+    margin-top: .75rem;
+    padding: .2rem .7rem;
+    background: var(--accent-dim);
+    border-radius: 999px;
+    font-size: .72rem;
+    font-family: var(--font-mono);
+    color: var(--accent);
+  }
+  .timeline-tag.done { background: rgba(80,200,120,.12); color: #4ec87a; }
+  .timeline-tag.wip  { background: rgba(212,168,67,.12); color: var(--accent); }
+  .timeline-tag.plan { background: rgba(255,255,255,.05); color: var(--text-3); }
+
+  /* ─── DEFENSE ────────────────────────────────────────────────── */
+  #defense {
+    border-top: 1px solid var(--border);
+  }
+  .defense-inner {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 5rem;
+    align-items: start;
+  }
+  .defense-left h2 {
+    font-family: var(--font-display);
+    font-size: clamp(2rem, 4vw, 3rem);
+    font-weight: 300;
+    line-height: 1.2;
+    margin-bottom: 1.5rem;
+  }
+  .defense-left p {
+    font-size: .95rem;
+    color: var(--text-2);
+    margin-bottom: 2rem;
+  }
+  .defense-info-row {
+    display: flex;
+    flex-direction: column;
+    gap: .75rem;
+    margin-bottom: 2.5rem;
+  }
+  .defense-info-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: .75rem 1.25rem;
+    border-bottom: 1px solid var(--border);
+    font-size: .88rem;
+  }
+  .defense-info-key { color: var(--text-3); font-family: var(--font-mono); font-size: .75rem; }
+  .defense-info-val { color: var(--text-1); }
+
+  .files-list {
+    display: flex;
+    flex-direction: column;
+    gap: .75rem;
+  }
+  .file-item {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem 1.25rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    transition: border-color .25s;
+    cursor: pointer;
+    text-decoration: none;
+    color: inherit;
+  }
+  .file-item:hover { border-color: rgba(212,168,67,.3); }
+  .file-icon {
+    width: 40px; height: 40px;
+    background: var(--accent-dim);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    flex-shrink: 0;
+  }
+  .file-info { flex: 1; }
+  .file-name { font-size: .9rem; font-weight: 400; }
+  .file-meta { font-size: .75rem; color: var(--text-3); font-family: var(--font-mono); }
+  .file-arrow { color: var(--text-3); font-size: 1rem; transition: transform .2s; }
+  .file-item:hover .file-arrow { transform: translateX(3px); color: var(--accent); }
+
+  /* ─── FOOTER ─────────────────────────────────────────────────── */
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 3rem 0;
+    background: linear-gradient(to bottom, #fbfaf8, #f0ebe3);
+  }
+  .footer-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .footer-logo {
+    font-family: var(--font-display);
+    font-size: 1rem;
+    color: var(--text-3);
+  }
+  .footer-copy {
+    font-size: .78rem;
+    color: var(--text-3);
+  }
+
+  /* ─── SCROLL REVEAL ──────────────────────────────────────────── */
+  .reveal {
+    opacity: 0;
+    transform: translateY(28px);
+    transition: opacity .7s ease, transform .7s ease;
+  }
+  .reveal.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  .reveal-delay-1 { transition-delay: .1s; }
+  .reveal-delay-2 { transition-delay: .2s; }
+  .reveal-delay-3 { transition-delay: .3s; }
+
+  /* ─── RESPONSIVE ─────────────────────────────────────────────── */
+  @media (max-width: 900px) {
+    nav { padding: 1rem 1.5rem; }
+    .nav-links { display: none; }
+    .abstract-grid,
+    .tech-grid,
+    .defense-inner,
+    .highlights-header,
+    .timeline-header { grid-template-columns: 1fr; gap: 2rem; }
+    .abstract-quote { position: static; }
+    .bento {
+      grid-template-columns: 1fr 1fr;
+    }
+    .bento-1,.bento-2,.bento-3,.bento-4,.bento-5 {
+      grid-column: span 2;
+      grid-row: span 1;
+    }
+    .metrics-row { grid-template-columns: repeat(2, 1fr); }
+    .screenshots-row { grid-template-columns: 1fr; }
+    .hero-meta { gap: 1.5rem; }
+    .hero-divider { display: none; }
+  }
+  @media (max-width: 560px) {
+    .bento { grid-template-columns: 1fr; }
+    .bento-1,.bento-2,.bento-3,.bento-4,.bento-5 { grid-column: span 1; }
+    .metrics-row { grid-template-columns: 1fr 1fr; }
+    section { padding: 4rem 0; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ─── NAV ──────────────────────────────────────────────────────── -->
+<nav id="main-nav">
+  <div class="nav-logo">毕设 · 展示</div>
+  <ul class="nav-links">
+    <li><a href="#abstract">摘要</a></li>
+    <li><a href="#highlights">亮点</a></li>
+    <li><a href="#tech">技术</a></li>
+    <li><a href="#results">成果</a></li>
+    <li><a href="#timeline">进度</a></li>
+    <li><a href="#defense">答辩</a></li>
+  </ul>
+  <div class="theme-toggle" id="theme-toggle">
+    <span class="theme-icon" id="theme-icon">☀️</span>
+    <span class="theme-label" id="theme-label">日</span>
+  </div>
+</nav>
+
+<!-- ─── HERO ──────────────────────────────────────────────────────── -->
+<section id="hero">
+  <div class="hero-orb orb-1"></div>
+  <div class="hero-orb orb-2"></div>
+  <div class="hero-inner">
+    <div class="hero-badge">
+      <span class="hero-badge-dot"></span>
+      2026 届毕业设计
+    </div>
+    <h1 class="hero-title">
+      <em>多模态大语言模型</em><br />
+      推理加速与轻量化部署
+    </h1>
+    <p class="hero-subtitle">
+      提出一种基于动态量化与注意力稀疏化的轻量级推理框架，在保持模型泛化能力的前提下，实现端边云全场景适配的高效部署方案。
+    </p>
+    <div class="hero-meta">
+      <div class="hero-meta-item">
+        <span class="hero-meta-label">作者</span>
+        <span class="hero-meta-value">李明博</span>
+      </div>
+      <div class="hero-divider"></div>
+      <div class="hero-meta-item">
+        <span class="hero-meta-label">指导老师</span>
+        <span class="hero-meta-value">王敏教授 / 张建副研究员</span>
+      </div>
+      <div class="hero-divider"></div>
+      <div class="hero-meta-item">
+        <span class="hero-meta-label">学院</span>
+        <span class="hero-meta-value">计算机科学与技术学院</span>
+      </div>
+      <div class="hero-divider"></div>
+      <div class="hero-meta-item">
+        <span class="hero-meta-label">答辩日期</span>
+        <span class="hero-meta-value">2026.06.15</span>
+      </div>
+    </div>
+    <div class="hero-ctas">
+      <a href="#results" class="btn-primary">查看成果</a>
+      <a href="#defense" class="btn-ghost">获取论文</a>
+    </div>
+  </div>
+  <div class="hero-scroll">
+    <div class="hero-scroll-line"></div>
+  </div>
+</section>
+
+<!-- ─── ABSTRACT ──────────────────────────────────────────────────── -->
+<section id="abstract">
+  <div class="container">
+    <div class="abstract-grid">
+      <div class="abstract-quote reveal">
+        <div class="abstract-quote-mark">"</div>
+        <p class="abstract-quote-text">
+          大语言模型的部署瓶颈不在模型本身的能力，而在于如何让这种能力在有限资源约束下高效释放。
+        </p>
+        <div class="abstract-quote-author">— 李明博 研究笔记</div>
+      </div>
+      <div class="abstract-body reveal reveal-delay-1">
+        <div class="section-label">研究摘要</div>
+        <h3>
+          多模态大语言模型的边缘化部署
+        </h3>
+        <p>
+          当前大语言模型在性能上已达到工业级水准，但其高计算成本与内存占用严重制约了在移动端、物联网等资源受限场景的部署。现有压缩方法（剪枝、蒸馏）多针对单一任务优化，难以保持多模态推理能力与模型泛化性。
+        </p>
+        <p>
+          本研究提出 AdaQ-Sparse 框架，结合动态量化策略与稀疏注意力机制，在推理阶段按输入动态调整计算精度与关键路径选择。相比现有方法，该方案避免了训练阶段的大规模标注依赖，实现了一次编码、多端适配的目标。
+        </p>
+        <p>
+          在公开基准（ImageNet-1K、COCO Caption、VQA v2）上，相比 INT8 基线提升精度 3.7%，推理速度提升 2.8 倍；在移动端（高通 Snapdragon）实现 <150ms 单帧端到端推理，内存占用仅 2.1GB。
+        </p>
+        <div class="abstract-keywords">
+          <span class="keyword">量化感知训练</span>
+          <span class="keyword">动态稀疏化</span>
+          <span class="keyword">多模态融合</span>
+          <span class="keyword">边缘推理</span>
+          <span class="keyword">模型压缩</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── HIGHLIGHTS ─────────────────────────────────────────────────── -->
+<section id="highlights">
+  <div class="container">
+    <div class="highlights-header reveal">
+      <h2>研究亮点<br />与核心贡献</h2>
+      <p>本研究在以下几个维度取得了显著成果，每项贡献都经过了严格的实验验证与对比分析。</p>
+    </div>
+
+    <div class="bento">
+      <!-- card 1 : span 3 -->
+      <div class="bento-card bento-1 reveal">
+        <div class="card-number">01 / 主要创新点</div>
+        <div class="card-title">动态精度分配算法</div>
+        <div class="card-desc">基于层级重要度评分的自适应量化方案，关键层保留 FP16 精度，非关键层量化至 INT4，自动化避免手工调优，兼容多种硬件加速库。</div>
+        <div class="card-stat">3.7%</div>
+        <div class="card-stat-label">精度提升 (vs INT8)</div>
+      </div>
+
+      <!-- card 2 : span 2 -->
+      <div class="bento-card bento-2 reveal reveal-delay-1">
+        <div class="card-number">02 / 实验设计</div>
+        <div class="card-title">多基准对比与消融</div>
+        <div class="card-desc">在 ImageNet-1K、COCO、VQA、MSCOCO Caption 上全面对比，包含 7 个 SOTA 基线，完整消融实验验证各模块贡献，重复 3 次取均值。</div>
+      </div>
+
+      <!-- card 3 : span 1 tall accent -->
+      <div class="bento-card bento-3 reveal reveal-delay-2">
+        <div class="card-number">03</div>
+        <div class="card-title">综合<br />贡献</div>
+        <div class="card-stat">5</div>
+        <div class="card-stat-label">核心创新模块</div>
+      </div>
+
+      <!-- card 4 : span 2 -->
+      <div class="bento-card bento-4 reveal reveal-delay-1">
+        <div class="card-number">04 / 系统实现</div>
+        <div class="card-title">跨平台推理框架</div>
+        <div class="card-desc">支持 x86/ARM/GPU 全覆盖，集成 TensorRT、NCNN、CoreML 后端，单一模型权重格式适配 CPU/GPU/NPU，自动路由最优引擎。</div>
+      </div>
+
+      <!-- card 5 : span 3 -->
+      <div class="bento-card bento-5 reveal reveal-delay-2">
+        <div class="card-number">05 / 落地价值</div>
+        <div class="card-title">端边云一体化部署</div>
+        <div class="card-desc">适用于智能终端、工业边缘网关、云端批处理等多层级场景。已集成到某头部厂商的 AI 助手产品（日活 200w+）和工业视觉检测系统中，降低成本 35%。</div>
+        <div class="card-stat">2.8×</div>
+        <div class="card-stat-label">推理速度提升</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── TECH STACK ──────────────────────────────────────────────────── -->
+<section id="tech">
+  <div class="container">
+    <div class="tech-grid">
+      <div class="tech-desc reveal">
+        <div class="section-label">技术架构</div>
+        <h2>从理论到实现的<br />完整技术体系</h2>
+        <p>本系统采用分层解耦的架构设计，各模块边界清晰、可独立迭代，兼顾研究灵活性与工程可靠性。</p>
+        <div class="tech-list">
+          <div class="tech-item">
+            <div class="tech-dot"></div>
+            <span class="tech-item-name">PyTorch 2.0 + ONNX Opset 18</span>
+            <span class="tech-item-role">深度学习框架</span>
+          </div>
+          <div class="tech-item">
+            <div class="tech-dot"></div>
+            <span class="tech-item-name">NumPy / Pandas / OpenCV</span>
+            <span class="tech-item-role">数据处理与预处理</span>
+          </div>
+          <div class="tech-item">
+            <div class="tech-dot"></div>
+            <span class="tech-item-name">FastAPI + NGINX</span>
+            <span class="tech-item-role">推理服务接口</span>
+          </div>
+          <div class="tech-item">
+            <div class="tech-dot"></div>
+            <span class="tech-item-name">TensorRT / NCNN / CoreML</span>
+            <span class="tech-item-role">推理加速后端</span>
+          </div>
+          <div class="tech-item">
+            <div class="tech-dot"></div>
+            <span class="tech-item-name">Docker + Kubernetes</span>
+            <span class="tech-item-role">容器化部署</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="arch-diagram reveal reveal-delay-2">
+        <div class="arch-nodes">
+          <div class="arch-node arch-node-1">图像 / 文本输入</div>
+          <div class="arch-node arch-node-2">Token 化</div>
+          <div class="arch-node arch-node-3">解码输出</div>
+          <div class="arch-node arch-node-4">Top-k 采样</div>
+          <div class="arch-node arch-node-5">Vision Encoder</div>
+          <div class="arch-node arch-node-6">动态剪枝</div>
+          <div class="arch-node arch-node-7">特征融合</div>
+          <div class="arch-node arch-node-8">LLM Core</div>
+        </div>
+        <div class="arch-center">
+          <span class="arch-center-label">AdaQ<br />Sparse</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── RESULTS ────────────────────────────────────────────────────── -->
+<section id="results">
+  <div class="container">
+    <div class="results-header reveal">
+      <div class="section-label">实验成果</div>
+      <h2>可量化的性能提升</h2>
+      <p>在公开基准数据集上与 SOTA 方法进行全面对比，结果可复现。</p>
+    </div>
+
+    <div class="metrics-row reveal reveal-delay-1">
+      <div class="metric-cell">
+        <div class="metric-value">88.4%</div>
+        <div class="metric-label">ImageNet Top-1 准确率</div>
+      </div>
+      <div class="metric-cell">
+        <div class="metric-value">67.2</div>
+        <div class="metric-label">COCO Caption CIDEr 分数</div>
+      </div>
+      <div class="metric-cell">
+        <div class="metric-value">142ms</div>
+        <div class="metric-label">移动端端到端推理延迟</div>
+      </div>
+      <div class="metric-cell">
+        <div class="metric-value">2.1GB</div>
+        <div class="metric-label">推理峰值内存占用</div>
+      </div>
+    </div>
+
+    <div class="screenshots-row reveal reveal-delay-2">
+      <div class="screenshot-card">
+        <div class="screenshot-inner">
+          <span class="screenshot-placeholder">[ 推理服务 Web UI ]</span>
+        </div>
+        <div class="screenshot-caption">实时推理界面 — 上传图像与文本查询</div>
+      </div>
+      <div class="screenshot-card">
+        <div class="screenshot-inner tall">
+          <span class="screenshot-placeholder">[ 量化效果对比 ]</span>
+        </div>
+        <div class="screenshot-caption">INT4 vs FP32 特征空间可视化</div>
+      </div>
+      <div class="screenshot-card">
+        <div class="screenshot-inner tall">
+          <span class="screenshot-placeholder">[ 性能基准对标 ]</span>
+        </div>
+        <div class="screenshot-caption">5 个基线方法的性能曲线</div>
+      </div>
+    </div>
+    
+    <div class="charts-grid reveal reveal-delay-3">
+      <div class="chart-card">
+        <div class="chart-title">精度对比分析</div>
+        <div class="chart-subtitle">不同量化方案在多个基准上的表现</div>
+        <canvas id="accuracy-chart" width="400" height="280"></canvas>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">推理延迟</div>
+        <div class="chart-subtitle">各平台的端到端推理时间</div>
+        <canvas id="latency-chart" width="300" height="280"></canvas>
+      </div>
+    </div>
+    
+    <!-- Honors & Recognition -->
+    <div class="honors-section reveal reveal-delay-4">
+      <div class="section-label">荣誉与认可</div>
+      <h3>学术成就与工业应用</h3>
+      
+      <div class="honors-grid">
+        <div class="honor-card honor-1">
+          <div class="honor-icon">🏆</div>
+          <div class="honor-title">学术竞赛获奖</div>
+          <div class="honor-list">
+            <div class="honor-item">中国科学技术大学研究生学术创新奖 · 2026</div>
+            <div class="honor-item">全国深度学习与边缘计算竞赛 · 一等奖</div>
+            <div class="honor-item">CCF THPC 学生论文竞赛 · Top 10</div>
+          </div>
+        </div>
+        
+        <div class="honor-card honor-2">
+          <div class="honor-icon">📰</div>
+          <div class="honor-title">论文发表</div>
+          <div class="honor-list">
+            <div class="honor-item">投稿 IEEE TPAMI（已被推荐）</div>
+            <div class="honor-item">已发表 IJCAI-2025 Workshop</div>
+            <div class="honor-item">arxiv.org 1.2K+ citations</div>
+          </div>
+        </div>
+        
+        <div class="honor-card honor-3">
+          <div class="honor-icon">🚀</div>
+          <div class="honor-title">工业应用</div>
+          <div class="honor-list">
+            <div class="honor-item">字节跳动 AI 助手集成部署</div>
+            <div class="honor-item">某头部云服务商推理框架内置</div>
+            <div class="honor-item">日活用户 500w+ · 降本 35%</div>
+          </div>
+        </div>
+        
+        <div class="honor-card honor-4">
+          <div class="honor-icon">💼</div>
+          <div class="honor-title">技术贡献</div>
+          <div class="honor-list">
+            <div class="honor-item">开源项目 GitHub Star 2.1K</div>
+            <div class="honor-item">TensorRT 官方案例参考实现</div>
+            <div class="honor-item">ONNX Runtime 优化方案贡献者</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── TIMELINE ───────────────────────────────────────────────────── -->
+<section id="timeline">
+  <div class="container">
+    <div class="timeline-header reveal">
+      <h2>研究进展<br />时间线</h2>
+      <p>从选题立项到最终成型的完整研究历程，记录每个关键节点的工作与产出。</p>
+    </div>
+
+    <div class="timeline">
+      <div class="timeline-item reveal">
+        <div class="timeline-dot"></div>
+        <div class="timeline-date">2025.09</div>
+        <div class="timeline-title">选题确认与文献调研</div>
+        <div class="timeline-desc">完成选题申报，精读 ICML/NeurIPS/ICCV 共 32 篇论文，梳理量化、剪枝、蒸馏三类方案的优缺点，提出混合策略初思。</div>
+        <span class="timeline-tag done">已完成</span>
+      </div>
+
+      <div class="timeline-item reveal reveal-delay-1">
+        <div class="timeline-dot"></div>
+        <div class="timeline-date">2025.11</div>
+        <div class="timeline-title">方案设计与实验框架搭建</div>
+        <div class="timeline-desc">确定 AdaQ-Sparse 整体框架，搭建 PyTorch 与 ONNX 完整工作流，复现 5 个基线（INT8、QAT、知识蒸馏等），完成 baseline 性能基准。</div>
+        <span class="timeline-tag done">已完成</span>
+      </div>
+
+      <div class="timeline-item reveal reveal-delay-1">
+        <div class="timeline-dot"></div>
+        <div class="timeline-date">2026.01</div>
+        <div class="timeline-title">核心模块开发与消融实验</div>
+        <div class="timeline-desc">实现动态精度分配、稀疏注意力、特征融合三大模块，完成 11 组消融实验，验证各模块单独贡献与叠加效果。</div>
+        <span class="timeline-tag done">已完成</span>
+      </div>
+
+      <div class="timeline-item reveal reveal-delay-2">
+        <div class="timeline-dot"></div>
+        <div class="timeline-date">2026.03</div>
+        <div class="timeline-title">系统集成与全面测试</div>
+        <div class="timeline-desc">完成 TensorRT / NCNN / CoreML 后端适配，在 ImageNet、COCO、VQA 三个公开基准上完整评测，生成性能报告与可视化。</div>
+        <span class="timeline-tag done">已完成</span>
+      </div>
+
+      <div class="timeline-item reveal reveal-delay-2">
+        <div class="timeline-dot"></div>
+        <div class="timeline-date">2026.04</div>
+        <div class="timeline-title">论文撰写与投稿审阅</div>
+        <div class="timeline-desc">完成论文初稿，送导师审阅并迭代 4 版，补充大量对比实验与细节分析，论文已进入定稿阶段。</div>
+        <span class="timeline-tag done">已完成</span>
+      </div>
+
+      <div class="timeline-item reveal reveal-delay-2">
+        <div class="timeline-dot"></div>
+        <div class="timeline-date">2026.05</div>
+        <div class="timeline-title">答辩演练与最后冲刺</div>
+        <div class="timeline-desc">制作答辩 PPT（60 页），进行 3 次预答辩演练，准备常见问题应答文档，细致打磨论文与展示质量。</div>
+        <span class="timeline-tag wip">进行中</span>
+      </div>
+
+      <div class="timeline-item reveal reveal-delay-3">
+        <div class="timeline-dot inactive"></div>
+        <div class="timeline-date">2026.06.15</div>
+        <div class="timeline-title">正式毕业答辩</div>
+        <div class="timeline-desc">于学院学位评定委员会前进行 20 分钟报告与 10 分钟答辩，成绩由三位教授联合评审。</div>
+        <span class="timeline-tag plan">待进行</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── DEFENSE ────────────────────────────────────────────────────── -->
+<section id="defense">
+  <div class="container">
+    <div class="defense-inner">
+      <div class="defense-left reveal">
+        <div class="section-label">答辩信息</div>
+        <h2>答辩安排<br />与研究资料</h2>
+        <p>以下为本次毕业答辩的基本信息及可下载的研究材料，欢迎老师和同学参阅。</p>
+
+        <div class="defense-info-row">
+          <div class="defense-info-item">
+            <span class="defense-info-key">TITLE</span>
+            <span class="defense-info-val">多模态大语言模型推理加速与轻量化部署方法研究</span>
+          </div>
+          <div class="defense-info-item">
+            <span class="defense-info-key">SCHOOL</span>
+            <span class="defense-info-val">中国科学技术大学</span>
+          </div>
+          <div class="defense-info-item">
+            <span class="defense-info-key">DEPARTMENT</span>
+            <span class="defense-info-val">计算机科学与技术学院 · 人工智能方向</span>
+          </div>
+          <div class="defense-info-item">
+            <span class="defense-info-key">ADVISOR</span>
+            <span class="defense-info-val">王敏教授（第一导师）/ 张建副研究员（联合指导）</span>
+          </div>
+          <div class="defense-info-item">
+            <span class="defense-info-key">DATE</span>
+            <span class="defense-info-val">2026 年 6 月 15 日 · 下午 2:00-2:30</span>
+          </div>
+          <div class="defense-info-item">
+            <span class="defense-info-key">LOCATION</span>
+            <span class="defense-info-val">西校区 信息楼 502 会议室</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="defense-right reveal reveal-delay-2">
+        <div class="section-label">下载资料</div>
+        <div class="files-list">
+          <a href="#" class="file-item">
+            <div class="file-icon">📄</div>
+            <div class="file-info">
+              <div class="file-name">毕业设计论文 (终稿)</div>
+              <div class="file-meta">PDF · 8.3 MB · 28 页 + 附录</div>
+            </div>
+            <div class="file-arrow">→</div>
+          </a>
+          <a href="#" class="file-item">
+            <div class="file-icon">📊</div>
+            <div class="file-info">
+              <div class="file-name">答辩演示文稿</div>
+              <div class="file-meta">PPTX · 12.4 MB · 60 页版本</div>
+            </div>
+            <div class="file-arrow">→</div>
+          </a>
+          <a href="#" class="file-item">
+            <div class="file-icon">💻</div>
+            <div class="file-info">
+              <div class="file-name">开源代码库 (GitHub)</div>
+              <div class="file-meta">github.com/liming-aiq-research · MIT License</div>
+            </div>
+            <div class="file-arrow">→</div>
+          </a>
+          <a href="#" class="file-item">
+            <div class="file-icon">📦</div>
+            <div class="file-info">
+              <div class="file-name">预训练模型权重 & 数据集</div>
+              <div class="file-meta">Cloud Drive · 7.2 GB · ImageNet/COCO</div>
+            </div>
+            <div class="file-arrow">→</div>
+          </a>
+          <a href="#" class="file-item">
+            <div class="file-icon">🎬</div>
+            <div class="file-info">
+              <div class="file-name">系统演示视频 + 实验讲解</div>
+              <div class="file-meta">YouTube · 18:45 · 完整版 + 字幕</div>
+            </div>
+            <div class="file-arrow">→</div>
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── FOOTER ─────────────────────────────────────────────────────── -->
+<footer>
+  <div class="container">
+    <div class="footer-inner">
+      <div class="footer-logo">李明博 · 2026 毕业设计</div>
+      <div class="footer-copy">中国科学技术大学 · 计算机科学与技术学院 · Made with ❤️</div>
+    </div>
+  </div>
+</footer>
+
+<script>
+  // Theme toggle
+  const toggle = document.getElementById('theme-toggle');
+  const icon = document.getElementById('theme-icon');
+  const label = document.getElementById('theme-label');
+  const body = document.body;
+  
+  function setTheme(isDark) {
+    if (isDark) {
+      body.classList.add('dark');
+      icon.textContent = '🌙';
+      label.textContent = '夜';
+      localStorage.setItem('theme', 'dark');
+    } else {
+      body.classList.remove('dark');
+      icon.textContent = '☀️';
+      label.textContent = '日';
+      localStorage.setItem('theme', 'light');
+    }
+  }
+  
+  // Load saved theme
+  const savedTheme = localStorage.getItem('theme') || 'light';
+  setTheme(savedTheme === 'dark');
+  
+  toggle.addEventListener('click', () => {
+    const isDark = body.classList.contains('dark');
+    setTheme(!isDark);
+  });
+
+  // Nav scroll effect
+  const nav = document.getElementById('main-nav');
+  window.addEventListener('scroll', () => {
+    nav.classList.toggle('scrolled', window.scrollY > 40);
+  }, { passive: true });
+
+  // Scroll reveal
+  const reveals = document.querySelectorAll('.reveal');
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        e.target.classList.add('visible');
+        io.unobserve(e.target);
+      }
+    });
+  }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+  reveals.forEach(el => io.observe(el));
+  
+  // Draw charts
+  function drawAccuracyChart() {
+    const canvas = document.getElementById('accuracy-chart');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = 400 * dpr;
+    canvas.height = 280 * dpr;
+    ctx.scale(dpr, dpr);
+    
+    const methods = ['INT8', 'QAT', '知识蒸馏', 'AdaQ-Sparse', 'FP32'];
+    const imagenet = [84.2, 85.1, 84.8, 88.4, 89.5];
+    const coco = [62.1, 63.5, 63.2, 67.2, 68.1];
+    const vqa = [71.3, 72.5, 72.1, 75.8, 76.9];
+    
+    const colors = ['#9CA3AF', '#818CF8', '#F59E0B', '#C4942D', '#10B981'];
+    const barWidth = 14;
+    const groupGap = 8;
+    const groupWidth = barWidth * 3 + groupGap * 2 + 10;
+    const chartWidth = 340;
+    const chartHeight = 220;
+    const startX = 40;
+    const startY = 30;
+    const maxValue = 100;
+    
+    // Background
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(0, 0, 400, 280);
+    
+    // Y-axis labels and grid
+    ctx.strokeStyle = '#E5E7EB';
+    ctx.lineWidth = 1;
+    ctx.fillStyle = '#888888';
+    ctx.font = '11px Outfit';
+    ctx.textAlign = 'right';
+    
+    for (let i = 0; i <= 5; i++) {
+      const y = startY + chartHeight - (chartHeight / 5) * i;
+      const value = (maxValue / 5) * i;
+      ctx.fillText(value.toFixed(0), startX - 8, y + 4);
+      ctx.beginPath();
+      ctx.moveTo(startX, y);
+      ctx.lineTo(startX + chartWidth, y);
+      ctx.stroke();
+    }
+    
+    // X-axis
+    ctx.strokeStyle = '#333333';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(startX, startY + chartHeight);
+    ctx.lineTo(startX + chartWidth, startY + chartHeight);
+    ctx.stroke();
+    
+    // Draw bars
+    ctx.textAlign = 'center';
+    ctx.font = '11px Outfit';
+    
+    methods.forEach((method, idx) => {
+      const groupX = startX + (groupWidth * idx) + 15;
+      
+      // ImageNet
+      const h1 = (imagenet[idx] / maxValue) * chartHeight;
+      ctx.fillStyle = colors[idx];
+      ctx.globalAlpha = 1;
+      ctx.fillRect(groupX, startY + chartHeight - h1, barWidth, h1);
+      
+      // COCO
+      const h2 = (coco[idx] / maxValue) * chartHeight;
+      ctx.globalAlpha = 0.7;
+      ctx.fillRect(groupX + barWidth + groupGap, startY + chartHeight - h2, barWidth, h2);
+      
+      // VQA
+      const h3 = (vqa[idx] / maxValue) * chartHeight;
+      ctx.globalAlpha = 0.4;
+      ctx.fillRect(groupX + (barWidth + groupGap) * 2, startY + chartHeight - h3, barWidth, h3);
+      
+      // Label
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = '#1a1a1a';
+      ctx.fillText(method, groupX + barWidth, startY + chartHeight + 18);
+    });
+    
+    // Legend
+    const legendY = startY + chartHeight + 40;
+    ctx.font = 'bold 11px Outfit';
+    ctx.fillText('■ ImageNet', startX + 50, legendY);
+    ctx.globalAlpha = 0.7;
+    ctx.fillText('■ COCO', startX + 150, legendY);
+    ctx.globalAlpha = 0.4;
+    ctx.fillText('■ VQA', startX + 230, legendY);
+  }
+  
+  function drawLatencyChart() {
+    const canvas = document.getElementById('latency-chart');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = 300 * dpr;
+    canvas.height = 280 * dpr;
+    ctx.scale(dpr, dpr);
+    
+    const platforms = ['CPU', 'GPU', 'Snapdragon', 'Apple M1'];
+    const latencies = [420, 85, 142, 98];
+    const colors_lat = ['#EF4444', '#3B82F6', '#C4942D', '#8B5CF6'];
+    
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(0, 0, 300, 280);
+    
+    const centerX = 150;
+    const centerY = 130;
+    const radius = 60;
+    const sliceAngle = (Math.PI * 2) / latencies.length;
+    const maxLatency = Math.max(...latencies);
+    
+    // Draw pie chart
+    latencies.forEach((lat, i) => {
+      const sliceSize = (lat / maxLatency) * sliceAngle;
+      const startAngle = (sliceAngle * i) - Math.PI / 2;
+      const endAngle = startAngle + sliceSize;
+      
+      ctx.fillStyle = colors_lat[i];
+      ctx.globalAlpha = 0.9;
+      ctx.beginPath();
+      ctx.moveTo(centerX, centerY);
+      ctx.arc(centerX, centerY, radius, startAngle, endAngle);
+      ctx.lineTo(centerX, centerY);
+      ctx.fill();
+      
+      // Label
+      const labelAngle = startAngle + sliceSize / 2;
+      const labelX = centerX + Math.cos(labelAngle) * (radius * 1.4);
+      const labelY = centerY + Math.sin(labelAngle) * (radius * 1.4);
+      
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = '#1a1a1a';
+      ctx.font = 'bold 10px Outfit';
+      ctx.textAlign = 'center';
+      ctx.fillText(platforms[i], labelX, labelY);
+      ctx.font = '9px Outfit';
+      ctx.fillText(lat + 'ms', labelX, labelY + 12);
+    });
+    
+    // Center label
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = '#C4942D';
+    ctx.font = 'bold 14px Outfit';
+    ctx.fillText('延迟对比', centerX, centerY + 5);
+  }
+  
+  // Wait for page to load, then draw charts
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+      setTimeout(() => {
+        drawAccuracyChart();
+        drawLatencyChart();
+      }, 100);
+    });
+  } else {
+    setTimeout(() => {
+      drawAccuracyChart();
+      drawLatencyChart();
+    }, 100);
+  }
+</script>
+
+</body>
+</html>
